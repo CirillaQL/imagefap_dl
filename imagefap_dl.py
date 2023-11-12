@@ -2,6 +2,7 @@ from yarl import URL
 import requests
 from bs4 import BeautifulSoup
 import re
+import os
 from urllib.parse import urlparse
 import time 
 
@@ -70,18 +71,21 @@ def get_all_image_url(image_list, url, page_offset, gallery_id):
         print("continue to get image url... ")
         get_all_image_url(image_list=image_list, url=new_url, page_offset=page_offset, gallery_id=gallery_id)
 
-def download_image(image_urls_list):
+def download_image(image_urls_list, output_dir, gallery_id):
+    real_download_dir = output_dir+"/"+gallery_id
+    if not os.path.exists(real_download_dir):
+        os.makedirs(real_download_dir)
     for url in image_urls_list:
         image_url = url["original"]
         a = URL(image_url)
         image_name = a.parts[-1]
         image_data = requests.get(image_url).content
-        with open(f"./"+image_name, 'wb') as f:
+        with open(real_download_dir+"/"+image_name, 'wb') as f:
             f.write(image_data)
         print(image_name," download success")
         time.sleep(0.5)
 
-def main(url):
+def main(url, output_dir):
     print(f"Trying to download images from {url}")
     gallery_id = get_gallery_id(url=url)
     image_page_urls = get_image_page_urls(url, gallery_id)
@@ -89,7 +93,7 @@ def main(url):
     count = 0
     ans = []
     get_all_image_url(ans, first_url, count, gallery_id)
-    download_image(ans)
+    download_image(ans, output_dir, gallery_id)
 
 if __name__ == "__main__":
     import argparse
@@ -101,5 +105,8 @@ if __name__ == "__main__":
         type=str,
         help="url of the gallery"
     )
+    parser.add_argument(
+        "-o", "--output", type=str, default="./download", help="Path to the output folder where images will be saved"
+    )
     args = parser.parse_args()
-    main(args.gallery_url)
+    main(args.gallery_url, args.output)
