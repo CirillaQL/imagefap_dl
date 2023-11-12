@@ -6,6 +6,8 @@ import os
 from urllib.parse import urlparse
 import time 
 
+max_retries = 3
+
 def get_gallery_id(url):
     url_struct = urlparse(url)
 
@@ -76,14 +78,32 @@ def download_image(image_urls_list, output_dir, gallery_id):
     if not os.path.exists(real_download_dir):
         os.makedirs(real_download_dir)
     for url in image_urls_list:
-        image_url = url["original"]
-        a = URL(image_url)
-        image_name = a.parts[-1]
-        image_data = requests.get(image_url).content
-        with open(real_download_dir+"/"+image_name, 'wb') as f:
-            f.write(image_data)
-        print(image_name," download success")
-        time.sleep(0.5)
+        retry = 0
+        while retry < max_retries:
+            try:
+                image_url = url["original"]
+                a = URL(image_url)
+                image_name = a.parts[-1]
+                image_response = requests.get(image_url, timeout=30)
+                if image_response.status_code == 200:
+                    image_data = image_response.content
+                    with open(real_download_dir+"/"+image_name, 'wb') as f:
+                        f.write(image_data)
+                    print(image_name," download success")
+                    break
+                else:
+                    print(f"Failed to download {image_name}. Status code: {image_response.status_code}")
+                    break
+            except requests.Timeout:
+                print(f"Request timed out for {image_url}. Retrying... ({retry + 1}/{max_retries})")
+                time.sleep(30)
+                retry += 1
+            except requests.RequestException as e:
+                print(f"Error during requests to {image_url} : {str(e)}")
+                time.sleep(30)
+                retry += 1
+    print("All images downloaded!")
+    
 
 def main(url, output_dir):
     print(f"Trying to download images from {url}")
